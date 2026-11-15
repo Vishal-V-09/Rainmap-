@@ -395,19 +395,26 @@
   color:#746b7a;
   margin:0;
   line-height:1.5}
-.stat>i {
-  display:block;
-  height:4px;
-  background:#ffffff99;
-  border-radius:4px;
-  margin-top:13px}
-.stat>i:after {
-  content:'';
-  display:block;
-  width:58%;
-  height:100%;
-  background:var(--ink);
-  border-radius:4px}
+
+/* Dynamic dashboard progress bars */
+.stat-progress {
+  width: 100%;
+  height: 4px;
+  margin-top: 13px;
+  background: #ffffff99;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.stat-progress span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--ink);
+  border-radius: 10px;
+  transition: width 0.6s ease;
+}
+
 .main-grid {
   display:grid;
   grid-template-columns:minmax(0,1.55fr) minmax(270px,.8fr);
@@ -554,7 +561,7 @@
   position:absolute;
   z-index:500;
   right:10px;
-  top:68px;
+  top:58px;
   display:flex;
   gap:3px;
   padding:4px;
@@ -1160,4 +1167,1041 @@ footer {
 .location-dropdown small {
   color: #756B82;
   font-size: 11px;
+}
+
+/* =================================
+   DASHBOARD - CURRENT CHENNAI OVERVIEW
+================================= */
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  flex-wrap: wrap;
+  padding: 20px 22px 16px;
+}
+
+.panel-heading h3 {
+  font: 800 15px Manrope;
+  color: var(--ink);
+  margin: 0 0 7px;
+}
+
+.panel-heading p {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.7;
+  color: #918899;
+}
+
+.small-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: #f7e6e3;
+  color: #b93b30;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.data-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 22px 17px;
+  padding: 13px 14px;
+  border: 1px solid #e7ddf2;
+  border-radius: 9px;
+  background: #f7f2fb;
+  color: #756b80;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.data-note svg {
+  flex-shrink: 0;
+  color: #8061a1;
+  margin-top: 2px;
+}
+
+.panel > .outline {
+  margin: 0 22px 20px;
+  padding: 10px 13px;
+  color: #6b4a8d;
+  border-color: #e3d8ee;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.panel > .outline:hover {
+  background: #f4eefb;
+  transform: translateY(-1px);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 520px) {
+  .panel-heading {
+    padding: 16px 14px 12px;
+  }
+
+  .data-note {
+    margin: 0 14px 14px;
+    padding: 11px;
+    font-size: 9px;
+  }
+
+  .panel > .outline {
+    margin: 0 14px 16px;
+  }
+}
+
+/* RainMap route planner - GPS location button */
+
+.route-location-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 14px;
+  margin-top: 2px;
+
+  border: 1px solid #dfd0ef;
+  border-radius: 9px;
+
+  background: #f4eefb;
+  color: #70528e;
+
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.route-location-button:hover:not(:disabled) {
+  background: #e9dcf5;
+  border-color: #cbb5e2;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(112, 82, 142, 0.10);
+}
+
+.route-location-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.route-location-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.route-location-button:focus-visible {
+  outline: 2px solid #9574b5;
+  outline-offset: 3px;
+}
+
+/* =====================================
+   RAINMAP SEARCH FIELD DESIGN
+===================================== */
+
+/* Rainfall Map - FROM and TO inputs */
+
+.route-search-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 13px !important;
+  border: 1px solid #e3d8ee !important;
+  border-radius: 9px !important;
+  background: #fff;
+  color: #352543;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.route-search-input::placeholder {
+  color: #aaa0b5;
+  font-size: 11px;
+}
+
+.route-search-input:focus {
+  border-color: #a98bc8 !important;
+  box-shadow: 0 0 0 3px #eee5f7;
+}
+
+.route-search-input:disabled {
+  background: #f4eefb !important;
+  color: #70528e;
+  cursor: not-allowed;
+}
+
+/* Rainfall Reports - search box */
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 270px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #e3d8ee;
+  border-radius: 9px;
+  background: #fff;
+  color: #907ca6;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-box:focus-within {
+  border-color: #a98bc8;
+  box-shadow: 0 0 0 3px #eee5f7;
+}
+
+.search-box input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #352543;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+}
+
+.search-box input::placeholder {
+  color: #aaa0b5;
+}
+
+.table-heading {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .search-box {
+    width: 100%;
+  }
+
+  .table-heading {
+    align-items: stretch;
+  } 
+
+  .route-planner {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* =====================================
+   RAINMAP NOTIFICATION CENTRE
+===================================== */
+
+.notification-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 20px 18px;
+}
+
+.notification-summary article {
+  display: grid;
+  gap: 10px;
+  padding: 15px;
+  border: 1px solid #e8e0ef;
+  border-radius: 11px;
+  background: #f8f5fb;
+}
+
+.notification-summary article span {
+  color: #81748d;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.notification-summary article strong {
+  color: #352543;
+  font: 800 23px Manrope;
+}
+
+.notification-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 20px 15px;
+  border-bottom: 1px solid #f0ebf3;
+}
+
+.notification-filters,
+.notification-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.notification-filters button {
+  padding: 8px 11px;
+  border: 1px solid #e8e0ef;
+  border-radius: 7px;
+  background: white;
+  color: #756a80;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notification-filters button.active {
+  background: #eee5f7;
+  border-color: #cbb5e2;
+  color: #68458c;
+}
+
+.notification-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #70528e;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notification-actions button:hover:not(:disabled) {
+  background: #f4eefb;
+}
+
+.notification-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.notification-list {
+  display: grid;
+  gap: 10px;
+  padding: 16px 20px 20px;
+}
+
+.notification-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid #e9e1ef;
+  border-left: 4px solid #a78ac5;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.notification-card.critical {
+  border-left-color: #d65c52;
+}
+
+.notification-card.warning {
+  border-left-color: #d9a43e;
+}
+
+.notification-card.read {
+  background: #faf9fb;
+}
+
+.notification-card-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #eee5f7;
+  color: #79569d;
+}
+
+.notification-card.critical .notification-card-icon {
+  background: #fae8e5;
+  color: #b94c42;
+}
+
+.notification-card.warning .notification-card-icon {
+  background: #fbf1dc;
+  color: #98701e;
+}
+
+.notification-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #92869d;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.notification-severity {
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #eee5f7;
+  color: #79569d;
+  text-transform: uppercase;
+}
+
+.notification-severity.critical {
+  background: #fae8e5;
+  color: #b94c42;
+}
+
+.notification-severity.warning {
+  background: #fbf1dc;
+  color: #98701e;
+}
+
+.unread-label {
+  color: #76529c;
+}
+
+.notification-card-content h4 {
+  margin: 9px 0 5px;
+  color: #352543;
+  font: 800 12px Manrope;
+}
+
+.notification-card-content p {
+  margin: 0 0 10px;
+  color: #756b80;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.notification-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.notification-card-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #92869d;
+  font-size: 8px;
+}
+
+.notification-card-content > small {
+  color: #a098a8;
+  font-size: 8px;
+}
+
+.notification-read-button {
+  flex-shrink: 0;
+  padding: 7px 9px;
+  border: 1px solid #e3d8ee;
+  border-radius: 7px;
+  background: white;
+  color: #70528e;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notification-read-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.notification-empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  padding: 45px 20px;
+}
+
+.notification-empty > div {
+  display: grid;
+  place-items: center;
+  width: 55px;
+  height: 55px;
+  border-radius: 15px;
+  background: #eee5f7;
+  color: #79569d;
+}
+
+.notification-empty h3 {
+  margin: 15px 0 6px;
+  color: #352543;
+  font: 800 14px Manrope;
+}
+
+.notification-empty p {
+  max-width: 330px;
+  margin: 0;
+  color: #92869d;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+@media (max-width: 650px) {
+  .notification-summary {
+    grid-template-columns: 1fr;
+    padding: 0 14px 14px;
+  }
+
+  .notification-toolbar {
+    padding: 0 14px 13px;
+  }
+
+  .notification-list {
+    padding: 13px;
+  }
+
+  .notification-card {
+    flex-wrap: wrap;
+  }
+
+  .notification-read-button {
+    margin-left: 51px;
+  }
+}
+
+/* =========================================
+   RAINMAP - RESPONSIVE LAYOUT ONLY
+   Keep existing desktop styles unchanged
+========================================= */
+
+/* Tablet */
+@media (max-width: 1100px) {
+  .main {
+    margin-left: 215px;
+    width: calc(100% - 215px);
+  }
+
+  .content {
+    width: 100%;
+    padding: 22px 18px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .main-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+  }
+
+  .panel {
+    min-width: 0;
+  }
+}
+
+/* Mobile and small tablets */
+@media (max-width: 800px) {
+  .main {
+    margin-left: 0;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sidebar {
+    width: min(280px, 85vw);
+    height: 100dvh;
+    overflow-y: auto;
+    transform: translateX(-105%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .brand {
+    padding-bottom: 18px;
+  }
+
+  .mobile-menu,
+  .close-mobile {
+    display: inline-grid;
+    place-items: center;
+  }
+
+  .topbar {
+    height: auto;
+    min-height: 62px;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .crumb {
+    min-width: 0;
+    gap: 7px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .top-actions {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .content {
+    width: 100%;
+    padding: 22px 16px;
+  }
+
+  .welcome {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .welcome > div {
+    min-width: 0;
+  }
+
+  .welcome h2 {
+    font-size: clamp(21px, 4vw, 28px);
+  }
+
+  .main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .map-panel,
+  .overview,
+  .table-panel {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .leaflet-map {
+    height: 340px;
+  }
+
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-wrap table {
+    min-width: 620px;
+  }
+}
+
+/* Mobile phones */
+@media (max-width: 520px) {
+  .topbar {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .crumb {
+    flex: 1;
+    overflow: hidden;
+    font-size: 9px;
+  }
+
+  .crumb span {
+    flex-shrink: 0;
+  }
+
+  .crumb b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .top-actions {
+    flex-shrink: 0;
+    gap: 6px;
+  }
+
+  .location {
+    max-width: 135px;
+    padding: 8px;
+    gap: 5px;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .location svg:last-child {
+    display: none;
+  }
+
+  .content {
+    padding: 18px 12px;
+  }
+
+  .welcome {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .welcome h2 {
+    font-size: 23px;
+    line-height: 1.25;
+    letter-spacing: -0.7px;
+  }
+
+  .welcome p {
+    max-width: 100%;
+    font-size: 10px;
+  }
+
+  .welcome > .primary {
+    align-self: flex-start;
+    padding: 10px 13px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .stat {
+    padding: 12px;
+    min-width: 0;
+  }
+
+  .stat > div {
+    font-size: 8px;
+    align-items: flex-start;
+  }
+
+  .stat > div span {
+    width: 27px;
+    height: 27px;
+    flex-shrink: 0;
+  }
+
+  .stat h3 {
+    font-size: 20px;
+    flex-wrap: wrap;
+  }
+
+  .stat h3 small {
+    font-size: 7px;
+  }
+
+  .stat p {
+    font-size: 8px;
+  }
+
+  .panel-head {
+    padding: 14px 12px;
+    gap: 8px;
+  }
+
+  .panel-head h3 {
+    font-size: 13px;
+  }
+
+  .panel-head p {
+    font-size: 9px;
+  }
+
+  .map-frame {
+    margin: 0 8px;
+  }
+
+  .leaflet-map {
+    height: 310px;
+  }
+
+  .map-search {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    padding: 10px;
+  }
+
+  .map-search input {
+    font-size: 11px;
+  }
+
+  .map-search > span {
+    display: none;
+  }
+
+  .map-toolbar {
+    top: 58px;
+    right: 8px;
+    max-width: calc(100% - 16px);
+  }
+
+  .map-toolbar button {
+    padding: 7px 6px;
+    font-size: 8px;
+  }
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .legend span {
+    font-size: 8px;
+  }
+
+  .conditions > div {
+    padding: 12px;
+  }
+
+  .table-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-search {
+    width: 100%;
+    max-width: none;
+  }
+
+  .table-footer {
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px;
+    font-size: 8px;
+  }
+
+  footer {
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 8px;
+  }
+
+  .notification {
+    right: 10px;
+    top: 58px;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 360px) {
+  .content {
+    padding: 15px 9px;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stat {
+    padding: 14px;
+  }
+
+  .welcome h2 {
+    font-size: 21px;
+  }
+
+  .location {
+    max-width: 115px;
+    font-size: 8px;
+  }
+
+  .leaflet-map {
+    height: 280px;
+  }
+
+  .legend {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-head {
+    padding: 12px 10px;
+  }
+}
+/* Rain Buddy AI Chat */
+
+.rain-buddy-chat {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 20px;
+    width: 360px;
+    height: 470px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #e7ddf2;
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(35, 20, 50, 0.16);
+    overflow: hidden;
+}
+
+.rain-buddy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: #f5effb;
+    border-bottom: 1px solid #e7ddf2;
+}
+
+.rain-buddy-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #7138b5;
+}
+
+.rain-buddy-title div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.rain-buddy-title strong {
+    font-size: 14px;
+}
+
+.rain-buddy-title small {
+    font-size: 11px;
+    color: #766b80;
+}
+
+.rain-buddy-messages {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.chat-message {
+    max-width: 85%;
+    padding: 11px 13px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.chat-message.assistant {
+    align-self: flex-start;
+    background: #f2edf8;
+    color: #352543;
+    border-bottom-left-radius: 3px;
+}
+
+.chat-message.user {
+    align-self: flex-end;
+    background: #7138b5;
+    color: #fff;
+    border-bottom-right-radius: 3px;
+}
+
+.chat-error {
+    color: #b42318;
+    font-size: 12px;
+}
+
+.rain-buddy-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid #eee6f4;
+}
+
+.rain-buddy-input input {
+    flex: 1;
+    min-width: 0;
+    padding: 11px;
+    border: 1px solid #e4d9ef;
+    border-radius: 9px;
+    outline: none;
+    font-size: 13px;
+}
+
+.rain-buddy-input input:focus {
+    border-color: #7138b5;
+}
+
+.rain-buddy-input button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 9px;
+    background: #7138b5;
+    color: white;
+    cursor: pointer;
+}
+
+.rain-buddy-input button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .rain-buddy-chat {
+        position: fixed;
+        top: 75px;
+        left: 12px;
+        right: 12px;
+        width: auto;
+        height: min(470px, calc(100dvh - 95px));
+    }
+}
+/* Rain Buddy Floating Launcher */
+
+.rain-buddy-launcher {
+    position: fixed;
+    right: 25px;
+    bottom: 25px;
+    z-index: 1500;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+
+    padding: 14px 20px;
+    border: none;
+    border-radius: 30px;
+
+    background: #7138b5;
+    color: #ffffff;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+    box-shadow: 0 5px 18px rgba(113, 56, 181, 0.3);
+    transition: all 0.25s ease;
+}
+
+.rain-buddy-launcher:hover {
+    background: #5e2c9c;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(113, 56, 181, 0.4);
+}
+
+@media (max-width: 600px) {
+    .rain-buddy-launcher {
+        right: 15px;
+        bottom: 15px;
+        padding: 13px 16px;
+        font-size: 13px;
+    }
 }
