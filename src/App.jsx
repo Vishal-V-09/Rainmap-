@@ -1,14 +1,50 @@
 import { useEffect, useState, useRef } from 'react'
+import Cropper from 'react-easy-crop'
+import AuthPage from './AuthPage'
+import { getCurrentUser, logoutUser, deleteAccount } from './services/authService'
+
 import {
-    MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMap
+    MapContainer,
+    TileLayer,
+    Marker,
+    Popup,
+    Polyline,
+    Polygon,
+    useMap
 } from 'react-leaflet'
+
 import L from 'leaflet'
+
 import {
-    CloudRain, LayoutDashboard, Map as MapIcon, FileText, Bell,
-    Settings, Search, Menu, MapPin, ChevronDown, Droplets, Activity,
-    Clock3, ArrowUpRight, MoreHorizontal, CircleCheck, CloudDrizzle,
-    X, ExternalLink, LocateFixed, Layers, MessageCircle, Navigation,
-    CheckCheck, Trash2, AlertTriangle, Route
+    CloudRain,
+    LayoutDashboard,
+    Map as MapIcon,
+    FileText,
+    Bell,
+    Settings,
+    Search,
+    Menu,
+    MapPin,
+    ChevronDown,
+    Droplets,
+    Activity,
+    Clock3,
+    ArrowUpRight,
+    MoreHorizontal,
+    CircleCheck,
+    CloudDrizzle,
+    X,
+    ExternalLink,
+    LocateFixed,
+    Layers,
+    MessageCircle,
+    Navigation,
+    CheckCheck,
+    Trash2,
+    AlertTriangle,
+    Route,
+    UserRound,
+    LogOut
 } from 'lucide-react'
 
 import './App.css'
@@ -346,14 +382,26 @@ const icons = {
     })
 }
 
-function Recenter() {
+function Recenter({ userLocation }) {
     const map = useMap()
 
     return (
         <button
             className="locate"
-            onClick={() => map.setView([13.0827, 80.2707], 12)}
-            title="Return to Chennai"
+            onClick={() => {
+                if (userLocation) {
+                    map.setView(
+                        [userLocation.lat, userLocation.lon],
+                        15,
+                        { animate: true }
+                    )
+                } else {
+                    map.setView([13.0827, 80.2707], 12, {
+                        animate: true
+                    })
+                }
+            }}
+            title="Go to my current location"
         >
             <LocateFixed size={17} />
         </button>
@@ -401,8 +449,21 @@ function MapView({
     reports,
     loading,
     boundaryPolygons,
-    monitoringMode
+    monitoringMode,
+    userLocation
 }) {
+
+    const currentLocationIcon = L.divIcon({
+        className: 'gps-location-icon',
+        html: `
+            <div class="gps-location-pulse">
+                <div class="gps-location-dot"></div>
+            </div>
+        `,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    })
+
     const [sat, setSat] = useState(false)
     const [routeStartText, setRouteStartText] = useState('')
     const [routeDestination, setRouteDestination] = useState('')
@@ -576,7 +637,36 @@ function MapView({
             )
         })
     }
+    async function reverseGeocode(coords) {
+        const params = new URLSearchParams({
+            lat: String(coords.lat),
+            lon: String(coords.lon),
+            format: 'jsonv2',
+            addressdetails: '1',
+            'accept-language': 'en'
+        })
 
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?${params}`
+        )
+
+        if (!response.ok) {
+            throw new Error('Could not identify your current area.')
+        }
+
+        const data = await response.json()
+        const address = data.address || {}
+
+        const parts = [
+            address.road,
+            address.neighbourhood,
+            address.suburb,
+            address.city_district,
+            address.city || address.town || address.village
+        ].filter(Boolean)
+
+        return [...new Set(parts)].join(', ') || 'Current GPS location'
+    }
     async function geocodePlace(text) {
         const params = new URLSearchParams({
             q: `${text}, Chennai, Tamil Nadu, India`,
@@ -633,11 +723,22 @@ function MapView({
 
         try {
             const start = useCurrentLocation
-                ? (detectedLocation || {
-                    ...(await getCurrentPosition()),
-                    label: 'Current GPS location'
-                })
+                ? await (async () => {
+                    const coords = detectedLocation || await getCurrentPosition()
+
+                    const label = await reverseGeocode(coords)
+
+                    const gpsLocation = {
+                        ...coords,
+                        label
+                    }
+
+                    setDetectedLocation(gpsLocation)
+
+                    return gpsLocation
+                })()
                 : (selectedStartPlace || await geocodePlace(startText))
+
             setRouteStart(start)
 
             const destination =
@@ -980,6 +1081,18 @@ function MapView({
                     zoomControl={true}
                     className="leaflet-map"
                 >
+                    {userLocation && (
+                        <Marker
+                            position={[userLocation.lat, userLocation.lon]}
+                            icon={currentLocationIcon}
+                            zIndexOffset={1000}
+                        >
+                            <Popup>
+                                <strong>You are here</strong>
+                            </Popup>
+                        </Marker>
+                    )}
+
                     <RouteViewport route={routeResult} />
 
                     {routeResult && routeStart && (
@@ -1065,7 +1178,7 @@ function MapView({
                         </Marker>
                     ))}
 
-                    <Recenter />
+                    <Recenter userLocation={userLocation} />
                 </MapContainer>
             </div>
 
@@ -1181,21 +1294,14 @@ function ReportModal({ close }) {
     return (
         <div className="backdrop" onClick={close}>
             <div className="modal" onClick={e => e.stopPropagation()}>
+
                 <div className="modal-head">
                     <div>
                         <small>COMMUNITY CONTRIBUTION</small>
                         <h3>What's happening outside?</h3>
                     </div>
-<button
-    className="rain-buddy-launcher"
-    onClick={() => setNotify(!notify)}
-    title="Chat with Rain Buddy"
-    aria-label="Chat with Rain Buddy"
->
-    <CloudRain size={20} />
-    <span>Chat with Rain Buddy</span>
-</button>
                 </div>
+
 
                 {sent ? (
                     <div className="success">
@@ -1296,49 +1402,248 @@ function ReportModal({ close }) {
 }
 
 
-export default function App() {
+function RainMapDashboard({ user, onLogout, onAccountDeleted }) {
     const [locationDropdownOpen, setLocationDropdownOpen] = useState(false)
     const [userLocation, setUserLocation] = useState(null)
+    const [locationName, setLocationName] = useState('Chennai, India')
+    const [locationLoading, setLocationLoading] = useState(false)
+    const [locationError, setLocationError] = useState('')
 
-    function useMyLocation() {
+    async function useMyLocation() {
         if (!navigator.geolocation) {
-            alert('Your browser does not support location access.')
+            setLocationError('Your browser does not support location access.')
             return
         }
 
-        navigator.geolocation.getCurrentPosition(
-            position => {
-                setUserLocation({
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude
-                })
-            },
-            () => {
-                alert('Please allow location access in your browser.')
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000
+        setLocationLoading(true)
+        setLocationError('')
+
+        try {
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                    resolve,
+                    reject,
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 20000,
+                        maximumAge: 30000
+                    }
+                )
+            })
+
+            const coords = {
+                lat: position.coords.latitude,
+                lon: position.coords.longitude
             }
-        )
+
+            // Save the actual GPS coordinates.
+            setUserLocation(coords)
+
+            // Convert GPS coordinates into a readable area name.
+            try {
+                const params = new URLSearchParams({
+                    lat: String(coords.lat),
+                    lon: String(coords.lon),
+                    format: 'jsonv2',
+                    addressdetails: '1',
+                    'accept-language': 'en'
+                })
+
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?${params}`
+                )
+
+                if (!response.ok) {
+                    throw new Error('Unable to identify your area.')
+                }
+
+                const data = await response.json()
+                const address = data.address || {}
+
+                const area =
+                    address.suburb ||
+                    address.neighbourhood ||
+                    address.city_district ||
+                    address.town ||
+                    address.village ||
+                    address.city
+
+                const city =
+                    address.city ||
+                    address.town ||
+                    address.village ||
+                    address.state_district
+
+                const parts = [...new Set([area, city].filter(Boolean))]
+
+                setLocationName(
+                    parts.length
+                        ? parts.join(', ')
+                        : 'Current GPS location'
+                )
+            } catch (error) {
+                console.warn('Reverse geocoding failed:', error)
+                setLocationName('Current GPS location')
+                setLocationError('Location detected, but the area name is unavailable.')
+            }
+
+        } catch (error) {
+            setLocationError(
+                error.code === 1
+                    ? 'Location permission denied. Please allow access in your browser.'
+                    : error.code === 3
+                        ? 'Location request timed out. Please try again.'
+                        : 'Unable to detect your location. Please try again.'
+            )
+        } finally {
+            setLocationLoading(false)
+        }
     }
 
     const [page, setPage] = useState('Dashboard')
+    const [profileOpen, setProfileOpen] = useState(false)
+
+    const [profileImage, setProfileImage] = useState(
+        () => localStorage.getItem('rainmap-profile-image') || ''
+    )
+
+    const profileImageInput = useRef(null)
+    const [cropImage, setCropImage] = useState('')
+    const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 })
+    const [cropZoom, setCropZoom] = useState(1)
+    const [cropDialogOpen, setCropDialogOpen] = useState(false)
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
+
+
+    function handleProfileImageChange(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image.')
+        event.target.value = ''
+        return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+        alert('Please choose an image smaller than 10 MB.')
+        event.target.value = ''
+        return
+    }
+
+    const reader = new FileReader()
+
+    reader.onload = () => {
+        setCropImage(reader.result)
+        setCropPosition({ x: 0, y: 0 })
+        setCropZoom(1)
+        setCroppedAreaPixels(null)
+        setCropDialogOpen(true)
+    }
+
+    reader.onerror = () => {
+        alert('Unable to read this image. Please try another one.')
+    }
+
+    reader.readAsDataURL(file)
+    event.target.value = ''
+}
+function handleCropComplete(_, croppedPixels) {
+    setCroppedAreaPixels(croppedPixels)
+}
+
+function handleSaveCroppedImage() {
+    if (!cropImage || !croppedAreaPixels) {
+        alert('Please adjust your image before saving.')
+        return
+    }
+
+    const image = new Image()
+
+    image.onload = () => {
+        try {
+            const canvas = document.createElement('canvas')
+            const ctx = canvas.getContext('2d')
+
+            // Final profile picture dimensions: 512 × 512
+            canvas.width = 512
+            canvas.height = 512
+
+            ctx.drawImage(
+                image,
+                croppedAreaPixels.x,
+                croppedAreaPixels.y,
+                croppedAreaPixels.width,
+                croppedAreaPixels.height,
+                0,
+                0,
+                512,
+                512
+            )
+
+            // Compress the cropped image
+            const croppedImage = canvas.toDataURL('image/jpeg', 0.85)
+
+            localStorage.setItem('rainmap-profile-image', croppedImage)
+            setProfileImage(croppedImage)
+
+            setCropDialogOpen(false)
+            setCropImage('')
+            setCroppedAreaPixels(null)
+        } catch (error) {
+            alert('Unable to save the cropped image. Please try a smaller image.')
+            console.error('Profile image save error:', error)
+        }
+    }
+
+    image.onerror = () => {
+        alert('Unable to process this image. Please try another one.')
+    }
+
+    image.src = cropImage
+}
+
+function handleCancelCrop() {
+    setCropDialogOpen(false)
+    setCropImage('')
+    setCroppedAreaPixels(null)
+}
+
+    function removeProfileImage() {
+        localStorage.removeItem('rainmap-profile-image')
+        setProfileImage('')
+    }
+
     const [search, setSearch] = useState('')
     const [mobile, setMobile] = useState(false)
     const [report, setReport] = useState(false)
     const [selected, setSelected] = useState('')
-    const [notify, setNotify] = useState(false)
+    const [rainBuddyOpen, setRainBuddyOpen] = useState(false)
+
     // Rain Buddy AI chat
-const [chatMessages, setChatMessages] = useState([
-    {
-        role: 'assistant',
-        text: "Hey! I'm Rain Buddy 🌧️ How can I help you today?"
-    }
-])
-const [chatInput, setChatInput] = useState('')
-const [chatLoading, setChatLoading] = useState(false)
-const [chatError, setChatError] = useState('')
+    const [chatMessages, setChatMessages] = useState([
+        {
+            role: 'assistant',
+            text: "Hey! I'm Rain Buddy 🌧️ How can I help you today?"
+        }
+    ])
+
+    const [theme, setTheme] = useState(
+        () => localStorage.getItem('rainmap-theme') || 'purple'
+    )
+    // Delete account confirmation
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [deletePassword, setDeletePassword] = useState('')
+    const [deleteError, setDeleteError] = useState('')
+    const [deletingAccount, setDeletingAccount] = useState(false)
+
+    useEffect(() => {
+        localStorage.setItem('rainmap-theme', theme)
+    }, [theme])
+
+    const [chatInput, setChatInput] = useState('')
+    const [chatLoading, setChatLoading] = useState(false)
+    const [chatError, setChatError] = useState('')
     // Notification centre
     const [notifications, setNotifications] = useState([])
     const [notificationFilter, setNotificationFilter] = useState('All')
@@ -1427,73 +1732,73 @@ const [chatError, setChatError] = useState('')
         })
     }
     useEffect(() => {
-    let cancelled = false
+        let cancelled = false
 
-    async function fetchCommunityReports() {
-        try {
-            const response = await fetch('http://localhost:5000/api/reports')
+        async function fetchCommunityReports() {
+            try {
+                const response = await fetch('http://localhost:5000/api/reports')
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch community reports')
-            }
+                if (!response.ok) {
+                    throw new Error('Failed to fetch community reports')
+                }
 
-            const data = await response.json()
+                const data = await response.json()
 
-            if (!data.success || !Array.isArray(data.reports)) {
-                throw new Error('Invalid reports response')
-            }
+                if (!data.success || !Array.isArray(data.reports)) {
+                    throw new Error('Invalid reports response')
+                }
 
-            if (cancelled) return
+                if (cancelled) return
 
-            setCommunityReports(data.reports)
+                setCommunityReports(data.reports)
 
-            // First fetch: remember existing reports only
-            if (!initialReportsLoaded.current) {
-                data.reports.forEach(report => {
-                    knownReportIds.current.add(String(report.id))
-                })
-
-                initialReportsLoaded.current = true
-                return
-            }
-
-            // Later fetches: notify only about new reports
-            const newReports = data.reports.filter(report =>
-                !knownReportIds.current.has(String(report.id))
-            )
-
-            if (newReports.length > 0) {
-                newReports.forEach(report => {
-                    knownReportIds.current.add(String(report.id))
-                })
-
-                newReports.forEach(report => {
-                    addNotification({
-                        key: `community-report-${report.id}`,
-                        category: 'Community Reports',
-                        severity: 'warning',
-                        title: `New community report: ${report.category}`,
-                        message: report.description,
-                        location: `${Number(report.latitude).toFixed(4)}, ${Number(report.longitude).toFixed(4)}`,
-                        source: 'MySQL Community Reports'
+                // First fetch: remember existing reports only
+                if (!initialReportsLoaded.current) {
+                    data.reports.forEach(report => {
+                        knownReportIds.current.add(String(report.id))
                     })
-                })
+
+                    initialReportsLoaded.current = true
+                    return
+                }
+
+                // Later fetches: notify only about new reports
+                const newReports = data.reports.filter(report =>
+                    !knownReportIds.current.has(String(report.id))
+                )
+
+                if (newReports.length > 0) {
+                    newReports.forEach(report => {
+                        knownReportIds.current.add(String(report.id))
+                    })
+
+                    newReports.forEach(report => {
+                        addNotification({
+                            key: `community-report-${report.id}`,
+                            category: 'Community Reports',
+                            severity: 'warning',
+                            title: `New community report: ${report.category}`,
+                            message: report.description,
+                            location: `${Number(report.latitude).toFixed(4)}, ${Number(report.longitude).toFixed(4)}`,
+                            source: 'MySQL Community Reports'
+                        })
+                    })
+                }
+
+            } catch (error) {
+                console.error('Community reports fetch error:', error)
             }
-
-        } catch (error) {
-            console.error('Community reports fetch error:', error)
         }
-    }
 
-    fetchCommunityReports()
+        fetchCommunityReports()
 
-    const interval = setInterval(fetchCommunityReports, 15000)
+        const interval = setInterval(fetchCommunityReports, 15000)
 
-    return () => {
-        cancelled = true
-        clearInterval(interval)
-    }
-}, [])
+        return () => {
+            cancelled = true
+            clearInterval(interval)
+        }
+    }, [])
 
     function markAsRead(id) {
         setNotifications(current =>
@@ -1515,47 +1820,71 @@ const [chatError, setChatError] = useState('')
         setNotifications([])
     }
     async function sendChatMessage(e) {
-    e?.preventDefault()
+        e?.preventDefault()
 
-    const message = chatInput.trim()
+        const message = chatInput.trim()
 
-    if (!message || chatLoading) return
-
-    setChatMessages(current => [
-        ...current,
-        { role: 'user', text: message }
-    ])
-
-    setChatInput('')
-    setChatLoading(true)
-    setChatError('')
-
-    try {
-        const response = await fetch('http://localhost:5000/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ message })
-        })
-
-        const data = await response.json()
-
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || 'Rain Buddy is unavailable.')
-        }
+        if (!message || chatLoading) return
 
         setChatMessages(current => [
             ...current,
-            { role: 'assistant', text: data.reply }
+            { role: 'user', text: message }
         ])
 
-    } catch (error) {
-        setChatError(error.message || 'Unable to connect to Rain Buddy.')
-    } finally {
-        setChatLoading(false)
+        setChatInput('')
+        setChatLoading(true)
+        setChatError('')
+
+        try {
+            const response = await fetch('http://localhost:5000/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Rain Buddy is unavailable.')
+            }
+
+            setChatMessages(current => [
+                ...current,
+                { role: 'assistant', text: data.reply }
+            ])
+
+        } catch (error) {
+            setChatError(error.message || 'Unable to connect to Rain Buddy.')
+        } finally {
+            setChatLoading(false)
+        }
     }
-}
+    async function handleDeleteAccount() {
+        if (!deletePassword || deletingAccount) return
+
+        setDeletingAccount(true)
+        setDeleteError('')
+
+        try {
+            await deleteAccount(deletePassword)
+
+            setDeleteDialogOpen(false)
+            setDeletePassword('')
+
+            // Backend has already deleted all sessions.
+            // Clear the frontend user and return to login.
+            onAccountDeleted()
+
+        } catch (error) {
+            setDeleteError(
+                error.message || 'Unable to delete your account. Please try again.'
+            )
+        } finally {
+            setDeletingAccount(false)
+        }
+    }
     // Load the boundary, generate the grid, then fetch weather in batches.
     useEffect(() => {
         let cancelled = false
@@ -1689,6 +2018,7 @@ const [chatError, setChatError] = useState('')
         }
     }, [])
 
+
     // Keep the existing scroll-based gradient behavior.
     useEffect(() => {
         const updateGradient = () => {
@@ -1717,19 +2047,29 @@ const [chatError, setChatError] = useState('')
     }, [])
 
     return (
-        <div className="shell">
+        <div className={`shell theme-${theme}`}>
             {mobile && (
-                <button className="overlay" onClick={() => setMobile(false)} />
+                <button
+                    className="overlay"
+                    onClick={() => setMobile(false)}
+                />
             )}
 
             <aside className={`sidebar ${mobile ? 'open' : ''}`}>
                 <div className="brand">
-                    <div className="brand-icon"><CloudRain size={23} /></div>
+                    <div className="brand-icon">
+                        <CloudRain size={23} />
+                    </div>
+
                     <div>
                         <h1>RainMap<span>Chennai</span></h1>
                         <small>RAIN AWARENESS STUDIO</small>
                     </div>
-                    <button className="close-mobile" onClick={() => setMobile(false)}>
+
+                    <button
+                        className="close-mobile"
+                        onClick={() => setMobile(false)}
+                    >
                         <X size={18} />
                     </button>
                 </div>
@@ -1748,8 +2088,11 @@ const [chatError, setChatError] = useState('')
                         >
                             <Icon size={18} />
                             {name}
+
                             {name === 'Notifications' && unreadCount > 0 && (
-                                <i>{unreadCount > 99 ? '99+' : unreadCount}</i>
+                                <i>
+                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                </i>
                             )}
                         </button>
                     ))}
@@ -1757,25 +2100,119 @@ const [chatError, setChatError] = useState('')
 
                 <div className="side-bottom">
                     <div className="buddy-card">
-                        <div className="buddy-icon"><CloudDrizzle size={20} /></div>
+                        <div className="buddy-icon">
+                            <CloudDrizzle size={20} />
+                        </div>
+
                         <small>A LITTLE RAIN CHECK</small>
                         <h3>Plans outside?</h3>
-                        <p>Check local reports before you head out. We’ll be honest when data is missing.</p>
+
                         <button onClick={() => setPage('Rainfall Map')}>
                             Explore the map <ArrowUpRight size={14} />
                         </button>
                     </div>
 
-                    <div className="profile">
-                        <div className="avatar">RM</div>
-                        <div>
-                            <b>RainMap explorer</b>
-                            <small>Chennai, Tamil Nadu</small>
+                    <div className="sidebar-profile">
+                        <div className="profile-avatar">
+                            {profileImage ? (
+                                <img
+                                    src={profileImage}
+                                    alt="Profile"
+                                    className="sidebar-profile-image"
+                                />
+                            ) : (
+                                <UserRound size={22} />
+                            )}
                         </div>
-                        <MoreHorizontal size={17} />
+
+                        <div className="profile-info">
+                            <strong>{user?.name || user?.fullName || 'RainMap User'}</strong>
+                            <span>{user?.email || 'No email available'}</span>
+                        </div>
+
+                        <button
+                            className="profile-menu-btn"
+                            onClick={() => setProfileOpen(prev => !prev)}
+                            aria-label="Open profile menu"
+                            title="Profile options"
+                        >
+                            <MoreHorizontal size={19} />
+                        </button>
+
+                        {profileOpen && (
+                            <>
+                                <div
+                                    className="profile-dismiss"
+                                    onClick={() => setProfileOpen(false)}
+                                />
+
+                                <div className="profile-popup">
+                                    <div className="profile-avatar large">
+                                        {profileImage ? (
+                                            <img src={profileImage} alt="Profile" />
+                                        ) : (
+                                            <UserRound size={27} />
+                                        )}
+                                    </div>
+
+                                    <div className="profile-popup-user">
+                                        <strong>{user?.name || user?.fullName || 'RainMap User'}</strong>
+                                        <span>{user?.email || 'No email available'}</span>
+                                    </div>
+
+                                    <div className="profile-popup-divider" />
+
+                                    <button
+                                        type="button"
+                                        className="profile-popup-item"
+                                        onClick={() => {
+                                            setPage('Profile')
+                                            setProfileOpen(false)
+                                            setMobile(false)
+                                        }}
+                                    >
+                                        <UserRound size={16} />
+                                        <span>My Profile</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="profile-popup-item"
+                                        onClick={() => {
+                                            setPage('Settings')
+                                            setProfileOpen(false)
+                                            setMobile(false)
+                                        }}
+                                    >
+                                        <Settings size={16} />
+                                        <span>Account Settings</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="profile-popup-item logout-item"
+                                        onClick={async () => {
+                                            setProfileOpen(false)
+                                            await onLogout()
+                                        }}
+                                    >
+                                        <LogOut size={16} />
+                                        <span>Logout</span>
+                                    </button>
+
+                                    <div className="profile-popup-divider" />
+
+                                    <div className="profile-popup-footer">
+                                        <CloudRain size={16} />
+                                        <span>RainMap Chennai</span>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </aside>
+
 
             <main className="main">
                 <header className="topbar">
@@ -1794,115 +2231,133 @@ const [chatError, setChatError] = useState('')
                                 aria-expanded={locationDropdownOpen}
                             >
                                 <MapPin size={15} />
-                                Chennai, India
+                                {locationLoading ? 'Detecting location...' : locationName}
                                 <ChevronDown size={13} />
                             </button>
 
                             {locationDropdownOpen && (
                                 <div className="location-dropdown">
-                                    <button onClick={() => {
-                                        setLocationDropdownOpen(false)
-                                        useMyLocation()
-                                    }}>
-                                        <MapPin size={16} />
+                                    <button
+                                        onClick={() => {
+                                            setLocationDropdownOpen(false)
+                                            useMyLocation()
+                                        }}
+                                        disabled={locationLoading}
+                                    >
+                                        <LocateFixed size={16} />
                                         <span>
-                                            <strong>Use my current location</strong>
-                                            <small>Detect location using your device</small>
+                                            <strong>
+                                                {locationLoading ? 'Detecting...' : 'Use my current location'}
+                                            </strong>
+                                            <small>Find your actual GPS location</small>
                                         </span>
                                     </button>
 
-                                    <button onClick={() => {
-                                        setLocationDropdownOpen(false)
-                                    }}>
+                                    <button
+                                        onClick={() => {
+                                            setUserLocation(null)
+                                            setLocationName('Chennai, India')
+                                            setLocationError('')
+                                            setLocationDropdownOpen(false)
+                                        }}
+                                    >
                                         <MapPin size={16} />
                                         <span>
-                                            <strong>Chennai, India</strong>
-                                            <small>Default location</small>
+                                            <strong>Reset to Chennai</strong>
+                                            <small>Return to the default location</small>
                                         </span>
                                     </button>
+
+                                    {locationError && (
+                                        <p className="location-error" role="alert">
+                                            {locationError}
+                                        </p>
+                                    )}
+
                                 </div>
                             )}
                         </div>
 
                         <button
-                            className="icon-button"
-                            onClick={() => setNotify(!notify)}
-                            aria-label="Notifications"
+                            className="rain-buddy-top-btn"
+                            onClick={() => setRainBuddyOpen(true)}
+                            aria-label="Open Rain Buddy"
+                            title="Rain Buddy"
                         >
-                            <Bell size={18} />
-                            {unreadCount > 0 && <i />}
+                            <CloudDrizzle size={19} />
+                            <span>Rain Buddy</span>
                         </button>
                     </div>
 
-                    {notify && (
-    <div className="rain-buddy-chat">
+                    {rainBuddyOpen && (
+                        <div className="rain-buddy-chat">
 
-        <div className="rain-buddy-header">
-            <div>
-                <div className="rain-buddy-title">
-                    <CloudDrizzle size={20} />
-                    <div>
-                        <strong>Rain Buddy</strong>
-                        <small>Your RainMap AI Assistant</small>
-                    </div>
-                </div>
-            </div>
+                            <div className="rain-buddy-header">
+                                <div>
+                                    <div className="rain-buddy-title">
+                                        <CloudDrizzle size={20} />
+                                        <div>
+                                            <strong>Rain Buddy</strong>
+                                            <small>Your RainMap AI Assistant</small>
+                                        </div>
+                                    </div>
+                                </div>
 
-            <button
-                className="icon-button"
-                onClick={() => setNotify(false)}
-                aria-label="Close Rain Buddy"
-            >
-                <X size={18} />
-            </button>
-        </div>
+                                <button
+                                    className="icon-button"
+                                    onClick={() => setRainBuddyOpen(false)}
+                                    aria-label="Close Rain Buddy"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
 
-        <div className="rain-buddy-messages">
-            {chatMessages.map((message, index) => (
-                <div
-                    key={index}
-                    className={`chat-message ${message.role}`}
-                >
-                    {message.text}
-                </div>
-            ))}
+                            <div className="rain-buddy-messages">
+                                {chatMessages.map((message, index) => (
+                                    <div
+                                        key={index}
+                                        className={`chat-message ${message.role}`}
+                                    >
+                                        {message.text}
+                                    </div>
+                                ))}
 
-            {chatLoading && (
-                <div className="chat-message assistant">
-                    Rain Buddy is thinking...
-                </div>
-            )}
+                                {chatLoading && (
+                                    <div className="chat-message assistant">
+                                        Rain Buddy is thinking...
+                                    </div>
+                                )}
 
-            {chatError && (
-                <div className="chat-error" role="alert">
-                    {chatError}
-                </div>
-            )}
-        </div>
+                                {chatError && (
+                                    <div className="chat-error" role="alert">
+                                        {chatError}
+                                    </div>
+                                )}
+                            </div>
 
-        <form
-            className="rain-buddy-input"
-            onSubmit={sendChatMessage}
-        >
-            <input
-                type="text"
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                placeholder="Ask Rain Buddy anything..."
-                disabled={chatLoading}
-            />
+                            <form
+                                className="rain-buddy-input"
+                                onSubmit={sendChatMessage}
+                            >
+                                <input
+                                    type="text"
+                                    value={chatInput}
+                                    onChange={e => setChatInput(e.target.value)}
+                                    placeholder="Ask Rain Buddy anything..."
+                                    disabled={chatLoading}
+                                />
 
-            <button
-                type="submit"
-                disabled={!chatInput.trim() || chatLoading}
-                aria-label="Send message"
-            >
-                <Navigation size={17} />
-            </button>
-        </form>
+                                <button
+                                    type="submit"
+                                    disabled={!chatInput.trim() || chatLoading}
+                                    aria-label="Send message"
+                                >
+                                    <Navigation size={17} />
+                                </button>
+                            </form>
 
-    </div>
-)}
+                        </div>
+                    )}
                 </header>
 
                 <div className="content">
@@ -1910,7 +2365,6 @@ const [chatError, setChatError] = useState('')
                         <div>
                             <small className="kicker"><i /> HYPERLOCAL RAIN AWARENESS</small>
                             <h2>{page === 'Dashboard' ? 'RainMap, street by street.' : page}</h2>
-                            <p>Local reports, clear timestamps, and no pretending when data is missing.</p>
                         </div>
                         <button className="primary" onClick={() => setReport(true)}>
                             <MapPin size={16} /> Report rain <b>+</b>
@@ -1939,6 +2393,7 @@ const [chatError, setChatError] = useState('')
                                 loading={weatherLoading}
                                 boundaryPolygons={boundaryPolygons}
                                 monitoringMode={monitoringMode}
+                                userLocation={userLocation}
                             />
 
                             <div className="data-note">
@@ -2214,54 +2669,188 @@ const [chatError, setChatError] = useState('')
                         </section>
                     )}
 
+
+
                     {page === 'Settings' && (
-                        <section className="panel">
-                            <div className="panel-heading">
+                        <section className="settings-page">
+
+                            <div className="settings-intro">
                                 <div>
-                                    <h3>Settings</h3>
-                                    <p>RainMap Chennai preferences.</p>
+                                    <p>Personalise your RainMap Chennai experience.</p>
                                 </div>
-                            </div>
-
-                            <div className="condition-row">
-                                <div className="condition-icon rain"><MapPin size={19} /></div>
-                                <div className="condition-text">
-                                    <strong>Default location</strong>
-                                    <span>Chennai, Tamil Nadu, India</span>
-                                </div>
-                            </div>
-
-                            <div className="condition-row">
-                                <div className="condition-icon unknown"><Activity size={19} /></div>
-                                <div className="condition-text">
-                                    <strong>Weather data source</strong>
-                                    <span>Open-Meteo API · refreshes every 10 minutes</span>
-                                </div>
-                            </div>
-
-                            <div className="condition-row">
-                                <div className="condition-icon rain"><MapIcon size={19} /></div>
-                                <div className="condition-text">
-                                    <strong>Monitoring coverage</strong>
-                                    <span>
-                                        {monitoringMode === 'grid'
-                                            ? `${reports.length} grid coordinates · approximately ${GRID_SPACING_KM} km spacing`
-                                            : 'Six fallback Chennai locations'}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="data-note">
-                                <Activity size={16} />
-                                <span>
-                                    Current weather is fetched from Open-Meteo.
-                                    Values are model estimates for the selected coordinates,
-                                    not confirmed street-level observations.
+                                <span className="settings-label">
+                                    <Settings size={14} /> PREFERENCES
                                 </span>
                             </div>
+
+                            <div className="settings-card">
+                                <div className="settings-card-heading">
+                                    <div className="settings-heading-icon">
+                                        <Layers size={19} />
+                                    </div>
+                                    <div>
+                                        <h3>Appearance</h3>
+                                        <p>Choose a colour theme for your workspace.</p>
+                                    </div>
+                                </div>
+
+                                <div className="theme-options">
+                                    {Object.entries(themeOptions).map(([key, item]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            className={`theme-option ${theme === key ? 'selected' : ''}`}
+                                            onClick={() => setTheme(key)}
+                                            aria-pressed={theme === key}
+                                        >
+                                            <div className="theme-preview">
+                                                <span style={{ background: item.accent }} />
+                                                <span style={{ background: item.soft }} />
+                                                <span style={{ background: item.text }} />
+                                            </div>
+
+                                            <div className="theme-option-name">
+                                                <strong>{item.name}</strong>
+                                                {theme === key && (
+                                                    <CircleCheck size={16} />
+                                                )}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Account Management */}
+                            <div className="settings-card account-management-card">
+                                <div className="settings-card-heading">
+                                    <div className="settings-heading-icon danger-icon">
+                                        <Trash2 size={19} />
+                                    </div>
+
+                                    <div>
+                                        <h3>Account Management</h3>
+                                        <p>Manage your RainMap account and personal data.</p>
+                                    </div>
+                                </div>
+
+                                <div className="delete-account-row">
+                                    <div>
+                                        <strong>Delete Account</strong>
+                                        <p>
+                                            Permanently deactivate your RainMap account.
+                                            You will be signed out from all devices.
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="delete-account-button"
+                                        onClick={() => {
+                                            setDeletePassword('')
+                                            setDeleteError('')
+                                            setDeleteDialogOpen(true)
+                                        }}
+                                    >
+                                        <Trash2 size={16} />
+                                        Delete Account
+                                    </button>
+                                </div>
+                            </div>
+
                         </section>
                     )}
 
+                    {page === 'Profile' && (
+                        <section className="profile-page">
+
+                            <div className="profile-page-heading">
+                                <div>
+                                    <p>Manage your RainMap Chennai profile.</p>
+                                </div>
+                                <div className="profile-page-heading-icon">
+                                    <UserRound size={20} />
+                                </div>
+                            </div>
+
+                            <div className="profile-page-card">
+
+                                <div className="profile-page-cover" />
+
+                                <div className="profile-page-main">
+                                    <div className="profile-page-avatar">
+                                        {profileImage ? (
+                                            <img src={profileImage} alt="Your profile picture" />
+                                        ) : (
+                                            <UserRound size={38} />
+                                        )}
+                                    </div>
+
+                                    <div className="profile-page-identity">
+                                        <h2>{user?.name || user?.fullName || 'RainMap User'}</h2>
+                                        <p>{user?.email || 'No email available'}</p>
+                                        <span>RainMap Chennai Member</span>
+                                    </div>
+                                </div>
+                                <div className="profile-picture-actions">
+                                    <input
+                                        ref={profileImageInput}
+                                        type="file"
+                                        accept="image/*"
+                                        hidden
+                                        onChange={handleProfileImageChange}
+                                    />
+
+                                    <button
+                                        type="button"
+                                        onClick={() => profileImageInput.current?.click()}
+                                    >
+                                        {profileImage ? 'Change picture' : 'Upload picture'}
+                                    </button>
+
+                                    {profileImage && (
+                                        <button
+                                            type="button"
+                                            className="remove-picture"
+                                            onClick={removeProfileImage}
+                                        >
+                                            Remove picture
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="profile-page-divider" />
+
+                                <div className="profile-details">
+                                    <h4>Personal Information</h4>
+
+                                    <div className="profile-detail-row">
+                                        <span>Display Name</span>
+                                        <strong>{user?.name || user?.fullName || 'Not available'}</strong>
+                                    </div>
+
+                                    <div className="profile-detail-row">
+                                        <span>Email Address</span>
+                                        <strong>{user?.email || 'Not available'}</strong>
+                                    </div>
+
+                                    <div className="profile-detail-row">
+                                        <span>Phone Number</span>
+                                        <strong>{user?.phone || 'Not available'}</strong>
+                                    </div>
+
+                                    <div className="profile-detail-row">
+                                        <span>Location</span>
+                                        <strong>Chennai, Tamil Nadu</strong>
+                                    </div>
+
+                                    <div className="profile-detail-row">
+                                        <span>Platform</span>
+                                        <strong>RainMap Chennai</strong>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </section>
+                    )}
 
                     {page === 'Dashboard' && (
                         <>
@@ -2396,7 +2985,276 @@ const [chatError, setChatError] = useState('')
                 </div>
             </main>
 
+
             {report && <ReportModal close={() => setReport(false)} />}
+            {deleteDialogOpen && (
+                <div className="delete-modal-overlay">
+                    <div className="delete-modal">
+                        <button
+                            type="button"
+                            className="delete-modal-close"
+                            onClick={() => {
+                                setDeleteDialogOpen(false)
+                                setDeletePassword('')
+                                setDeleteError('')
+                            }}
+                            aria-label="Close dialog"
+                        >
+                            <X size={19} />
+                        </button>
+
+                        <div className="delete-modal-icon">
+                            <AlertTriangle size={27} />
+                        </div>
+
+                        <h2>Delete your account?</h2>
+
+                        <p>
+                            This will deactivate your RainMap account and sign you
+                            out from all devices. This action cannot be undone
+                            through the application.
+                        </p>
+
+                        <label htmlFor="delete-account-password">
+                            Confirm your current password
+                        </label>
+
+                        <input
+                            id="delete-account-password"
+                            type="password"
+                            value={deletePassword}
+                            onChange={e => setDeletePassword(e.target.value)}
+                            placeholder="Enter your password"
+                            autoComplete="current-password"
+                            disabled={deletingAccount}
+                        />
+
+                        {deleteError && (
+                            <div className="delete-modal-error" role="alert">
+                                {deleteError}
+                            </div>
+                        )}
+
+                        <div className="delete-modal-actions">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDeleteDialogOpen(false)
+                                    setDeletePassword('')
+                                    setDeleteError('')
+                                }}
+                                disabled={deletingAccount}
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                className="confirm-delete-button"
+                                onClick={handleDeleteAccount}
+                                disabled={!deletePassword || deletingAccount}
+                            >
+                                {deletingAccount ? 'Deleting...' : 'Confirm Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+{cropDialogOpen && cropImage && (
+    <div className="profile-crop-overlay">
+        <div className="profile-crop-modal">
+
+            <div className="profile-crop-header">
+                <div>
+                    <h2>Adjust Profile Picture</h2>
+                    <p>Move and zoom your photo to fit perfectly.</p>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={handleCancelCrop}
+                    aria-label="Close crop editor"
+                >
+                    <X size={20} />
+                </button>
+            </div>
+
+            <div className="profile-cropper-container">
+                <Cropper
+                    image={cropImage}
+                    crop={cropPosition}
+                    zoom={cropZoom}
+                    aspect={1}
+                    onCropChange={setCropPosition}
+                    onZoomChange={setCropZoom}
+                    onCropComplete={handleCropComplete}
+                />
+            </div>
+
+            <div className="profile-crop-zoom">
+                <label htmlFor="profile-crop-zoom">
+                    Zoom
+                </label>
+
+                <input
+                    id="profile-crop-zoom"
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    value={cropZoom}
+                    onChange={(e) => setCropZoom(Number(e.target.value))}
+                />
+
+                <span>{cropZoom.toFixed(1)}x</span>
+            </div>
+
+            <div className="profile-crop-actions">
+                <button
+                    type="button"
+                    onClick={handleCancelCrop}
+                    className="crop-cancel-button"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="button"
+                    onClick={handleSaveCroppedImage}
+                    disabled={!croppedAreaPixels}
+                    className="crop-save-button"
+                >
+                    Save Picture
+                </button>
+            </div>
+
         </div>
+    </div>
+)}
+
+        </div >
     )
 }
+
+const themeOptions = {
+    purple: {
+        name: 'RainMap Purple',
+        accent: '#8050C8',
+        soft: '#F0E8FA',
+        background: '#F7F3FC',
+        text: '#30243D',
+        border: '#E4D8F0'
+    },
+    ocean: {
+        name: 'Ocean Blue',
+        accent: '#0284C7',
+        soft: '#E0F2FE',
+        background: '#F0F9FF',
+        text: '#164E75',
+        border: '#BAE6FD'
+    },
+    forest: {
+        name: 'Forest Green',
+        accent: '#16A34A',
+        soft: '#DCFCE7',
+        background: '#F0FDF4',
+        text: '#14532D',
+        border: '#BBF7D0'
+    },
+    sunset: {
+        name: 'Sunset Orange',
+        accent: '#EA580C',
+        soft: '#FFEDD5',
+        background: '#FFF7ED',
+        text: '#7C2D12',
+        border: '#FED7AA'
+    },
+    midnight: {
+        name: 'Midnight',
+        accent: '#A78BFA',
+        soft: '#39334D',
+        background: '#252238',
+        text: '#F3EFFF',
+        border: '#51466C'
+    }
+}
+
+export default function App() {
+    const [user, setUser] = useState(null)
+    const [checkingSession, setCheckingSession] = useState(true)
+
+    // Check whether the visitor already has a valid login session.
+    useEffect(() => {
+        let cancelled = false
+
+        async function checkSession() {
+            try {
+                const response = await getCurrentUser()
+
+                if (!cancelled) {
+                    setUser(response.user || null)
+                }
+            } catch (error) {
+                console.log('No active RainMap session:', error.message)
+
+                if (!cancelled) {
+                    setUser(null)
+                }
+            } finally {
+                if (!cancelled) {
+                    setCheckingSession(false)
+                }
+            }
+        }
+
+        checkSession()
+
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    // Handle logout.
+    async function handleLogout() {
+        try {
+            await logoutUser()
+            setUser(null)
+        } catch (error) {
+            console.error('Logout failed:', error)
+        }
+    }
+
+    // Display a loading screen while checking the session.
+    if (checkingSession) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#F7F3FC',
+                color: '#8050C8',
+                fontSize: 16,
+                fontWeight: 600
+            }}>
+                Checking your RainMap session...
+            </div>
+        )
+    }
+
+    // Visitors without a valid session must authenticate first.
+    if (!user) {
+        return <AuthPage onAuthenticated={setUser} />
+    }
+
+    // Authenticated users can access the existing dashboard.
+    return (
+        <RainMapDashboard
+            user={user}
+            onLogout={handleLogout}
+            onAccountDeleted={() => setUser(null)}
+        />
+    )
+}
+
